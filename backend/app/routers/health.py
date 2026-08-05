@@ -1,4 +1,7 @@
 from fastapi import APIRouter
+from datetime import datetime
+from app.core.settings import settings
+
 
 # router = APIRouter(prefix="/health", tags=["Health"])
 router = APIRouter(prefix="/api/v1/health", tags=["Health"])
@@ -8,5 +11,7 @@ router = APIRouter(prefix="/api/v1/health", tags=["Health"])
 def health_check():
     return {
         "status": "healthy",
-        "message": "AI Knowledge Assistant API is running"
+        "service": "AI Knowledge Assistant",
+        "version": settings.APP_VERSION,
+        "timestamp": datetime.now(datetime.timezone.utc).isoformat()
     }
