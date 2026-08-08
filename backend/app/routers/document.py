@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.services.document.pdf_service import PDFService
 from app.schemas.document import DocumentUploadResponse
+from app.services.document.chunker import DocumentChunker
 
 
 router = APIRouter(
@@ -39,17 +40,21 @@ async def upload_document(file: UploadFile = File(...)):
     # with open("text_data.txt", "w", encoding="utf-8") as text_file:
     #     text_file.write(pdf_data["text"])
 
+    chunker = DocumentChunker()
+    chunks = chunker.chunk_pages(
+        pages=pdf_data["pages"],
+        source_filename=file.filename,
+    )
+
     return {
         "message": "Document uploaded successfully",
-
         "original_filename": file.filename,
-
         "stored_filename": stored_filename,
-
         "page_count": pdf_data["page_count"],
-
         "text_length": sum(
             len(page["text"])
             for page in pdf_data["pages"]
         ),
+        "chunk_count": len(chunks),
+        "sample_chunks": chunks[:3],
     }

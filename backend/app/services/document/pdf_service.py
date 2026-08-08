@@ -1,6 +1,8 @@
 from pathlib import Path
 import fitz
 
+from app.services.document.text_cleaner import TextCleaner
+
 
 class PDFService:
     @staticmethod
@@ -18,11 +20,10 @@ class PDFService:
         pages = []
 
         for page_number, page in enumerate(document, start=1):
-
             pages.append(
                 {
                     "page": page_number,
-                    "text": page.get_text("text")
+                    "text": TextCleaner.clean(page.get_text("text"))
                 }
             )
 
@@ -34,5 +35,4 @@ class PDFService:
         }
 
         document.close()
-
         return result
