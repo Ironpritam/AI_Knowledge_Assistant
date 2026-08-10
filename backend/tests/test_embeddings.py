@@ -3,7 +3,7 @@ from app.services.vector.embedding_service import EmbeddingService
 
 def test_single_embedding():
 
-    service = EmbeddingService()
+    service = EmbeddingService("qwen-0.6b")
 
     text = "The Transformer architecture uses self-attention."
 

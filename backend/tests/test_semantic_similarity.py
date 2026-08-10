@@ -5,7 +5,7 @@ from app.services.vector.embedding_service import EmbeddingService
 
 def test_semantic_similarity():
 
-    service = EmbeddingService()
+    service = EmbeddingService("qwen-0.6b")
 
     text_a = "The Transformer architecture uses self-attention."
     text_b = "Transformers rely on attention mechanisms."
