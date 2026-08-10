@@ -14,9 +14,7 @@ EMBEDDING_MODELS = {
 
 
 class EmbeddingService:
-
     def __init__(self, model_name: str = "bge-small"):
-
         if model_name not in EMBEDDING_MODELS:
             raise ValueError(
                 f"Unknown embedding model: {model_name}. "
@@ -27,56 +25,30 @@ class EmbeddingService:
         self.model_path = EMBEDDING_MODELS[model_name]
 
         if not self.model_path.exists():
-            raise FileNotFoundError(
-                f"Embedding model not found: {self.model_path}"
-            )
+            raise FileNotFoundError(f"Embedding model not found: {self.model_path}")
 
-        self.model = SentenceTransformer(
-            str(self.model_path)
-        )
+        self.model = SentenceTransformer(str(self.model_path))
 
-    def embed_query(
-        self,
-        query: str,
-    ) -> list[float]:
+    @property
+    def dimension(self) -> int:
+        return self.model.get_embedding_dimension()
 
+    def embed_query(self,query: str,) -> list[float]:
         if self.model_key == "qwen-0.6b":
-
-            embedding = self.model.encode(
-                query,
-                prompt_name="query",
-                normalize_embeddings=True,
-            )
-
+            embedding = self.model.encode(query,prompt_name="query",normalize_embeddings=True,)
         else:
-
-            embedding = self.model.encode(
-                query,
-                normalize_embeddings=True,
-            )
+            embedding = self.model.encode(query,normalize_embeddings=True,)
 
         return embedding.tolist()
 
-    def embed_document(
-        self,
-        text: str,
-    ) -> list[float]:
 
-        embedding = self.model.encode(
-            text,
-            normalize_embeddings=True,
-        )
+    def embed_document(self,text: str,) -> list[float]:
+        embedding = self.model.encode(text,normalize_embeddings=True,)
 
         return embedding.tolist()
 
-    def embed_documents(
-        self,
-        texts: list[str],
-    ) -> list[list[float]]:
 
-        embeddings = self.model.encode(
-            texts,
-            normalize_embeddings=True,
-        )
+    def embed_documents(self,texts: list[str],) -> list[list[float]]:
+        embeddings = self.model.encode(texts,normalize_embeddings=True,)
 
         return embeddings.tolist()
