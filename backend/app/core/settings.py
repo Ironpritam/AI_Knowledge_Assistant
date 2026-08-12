@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -11,11 +11,23 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     DATABASE_URL: str
+    
+    GOOGLE_API_KEY: str | None = None
 
-    GOOGLE_API_KEY: str
+    # Embedding configuration
+    EMBEDDING_MODEL: str = "bge-small"
 
-    class Config:
-        env_file = ".env"
+    # LLM configuration
+    LLM_PROVIDER: str = "ollama"
+    LLM_MODEL: str = "qwen3:8b"
+
+    # RAG configuration
+    DEFAULT_COLLECTION: str = "documents"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+    )
 
 
 settings = Settings()

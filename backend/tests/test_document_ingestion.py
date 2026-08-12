@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from app.services.document.ingestion_service import (
-    DocumentIngestionService,
-)
+from app.services.document.ingestion_service import (DocumentIngestionService,)
+from app.services.vector.chroma_service import ChromaService
+from app.services.vector.embedding_service import EmbeddingService
 
 
 def test_real_document_ingestion():
@@ -11,12 +11,16 @@ def test_real_document_ingestion():
         "storage/documents/uploaded/sample.pdf"
     )
 
-    service = DocumentIngestionService(
-        embedding_model="bge-small",
-        collection_name="test_ingestion_bge",
+    embedding_service = EmbeddingService(model_name="bge-small")
+
+    chroma_service = ChromaService()
+
+    ingestion_service = DocumentIngestionService(
+        embedding_service=embedding_service,
+        chroma_service=chroma_service,
     )
 
-    result = service.ingest(pdf_path)
+    result = ingestion_service.ingest(pdf_path, collection_name="test_documents_bge",)
 
     print("\nIngestion result:")
     print(result)
