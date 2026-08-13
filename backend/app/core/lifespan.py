@@ -4,6 +4,7 @@ from app.core.settings import settings
 from app.services.vector.embedding_service import EmbeddingService
 from app.services.vector.chroma_service import ChromaService
 from app.services.llm.llm_service import LLMService
+from app.services.document.ingestion_service import DocumentIngestionService
 
 
 
@@ -42,9 +43,16 @@ async def lifespan(app):
     # --------------------------------------------------
     chroma_service = ChromaService()
 
+
+    document_ingestion_service = DocumentIngestionService(
+        embedding_service=embedding_service,
+        chroma_service=chroma_service,
+    )
+
     app.state.embedding_service = embedding_service
     app.state.llm_service = llm_service
     app.state.chroma_service = chroma_service
+    app.state.document_ingestion_service = document_ingestion_service
 
     print("✅ AI Knowledge Assistant ready")
     yield

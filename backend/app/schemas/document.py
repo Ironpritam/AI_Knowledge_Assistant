@@ -16,7 +16,11 @@ class DocumentUploadResponse(BaseModel):
     message: str
     original_filename: str
     stored_filename: str
+    collection_name: str
+
     page_count: int
-    text_length: int
     chunk_count: int
-    sample_chunks: list[DocumentChunk]
+
+    embedding_model: str
+    embedding_dimension: int
+    vector_count: int

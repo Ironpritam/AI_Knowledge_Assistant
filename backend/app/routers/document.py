@@ -2,11 +2,15 @@ from pathlib import Path
 import shutil
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, Depends
 
-from app.services.document.pdf_service import PDFService
+# from app.services.document.pdf_service import PDFService
 from app.schemas.document import DocumentUploadResponse
-from app.services.document.chunker import DocumentChunker
+# from app.services.document.chunker import DocumentChunker
+
+
+from app.dependencies.services import get_ingestion_service
+from app.services.document.ingestion_service import DocumentIngestionService
 
 
 router = APIRouter(
@@ -21,7 +25,10 @@ ALLOWED_EXTENSIONS = {".pdf"}
 
 
 @router.post("/upload",response_model=DocumentUploadResponse)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...),
+    collection_name: str = Query("test_ingestion_bge"),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+):
     extension = Path(file.filename).suffix.lower()
 
     if extension not in ALLOWED_EXTENSIONS:
@@ -36,25 +43,37 @@ async def upload_document(file: UploadFile = File(...)):
     with destination.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    pdf_data = PDFService.extract_document(destination)
-    # with open("text_data.txt", "w", encoding="utf-8") as text_file:
-    #     text_file.write(pdf_data["text"])
+    # pdf_data = PDFService.extract_document(destination)
+    # # with open("text_data.txt", "w", encoding="utf-8") as text_file:
+    # #     text_file.write(pdf_data["text"])
 
-    chunker = DocumentChunker()
-    chunks = chunker.chunk_pages(
-        pages=pdf_data["pages"],
-        source_filename=file.filename,
+    # chunker = DocumentChunker()
+    # chunks = chunker.chunk_pages(
+    #     pages=pdf_data["pages"],
+    #     source_filename=file.filename,
+    # )
+    
+    result = ingestion_service.ingest(
+        pdf_path=destination,
+        collection_name=collection_name,
     )
 
+    # return {
+    #     "message": "Document uploaded successfully",
+    #     "original_filename": file.filename,
+    #     "stored_filename": stored_filename,
+    #     "page_count": pdf_data["page_count"],
+    #     "text_length": sum(
+    #         len(page["text"])
+    #         for page in pdf_data["pages"]
+    #     ),
+    #     "chunk_count": len(chunks),
+    #     "sample_chunks": chunks[:3],
+    # }
     return {
-        "message": "Document uploaded successfully",
+        "message": "Document uploaded and indexed successfully",
         "original_filename": file.filename,
         "stored_filename": stored_filename,
-        "page_count": pdf_data["page_count"],
-        "text_length": sum(
-            len(page["text"])
-            for page in pdf_data["pages"]
-        ),
-        "chunk_count": len(chunks),
-        "sample_chunks": chunks[:3],
+        "collection_name": collection_name,
+        **result,
     }
