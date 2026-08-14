@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # LLM configuration
     LLM_PROVIDER: str = "ollama"
     LLM_MODEL: str = "qwen3:8b"
+    LLM_DEFAULT_MODEL_ID: str | None = None
+
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODELS: str = "qwen3:8b"
+
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODELS: str = ""
 
     # RAG configuration
     DEFAULT_COLLECTION: str = "documents"

@@ -14,6 +14,7 @@ from app.dependencies.database import get_db
 from app.dependencies.services import (
     get_chroma_service,
     get_ingestion_service,
+    get_llm_model_registry,
     get_rag_service,
 )
 from app.models.document import Document
@@ -56,6 +57,13 @@ class EmptyRetrievalService:
 class FailingLLMService:
     def generate(self, messages: list[dict]) -> str:
         raise AssertionError("The LLM must not be called when retrieval is empty.")
+
+
+class FakeModelRegistry:
+    default_model_id = "test:default"
+
+    def resolve(self, model_id: str | None = None):
+        return type("Model", (), {"id": model_id or self.default_model_id})()
 
 
 class FailingIngestionService:
@@ -134,6 +142,7 @@ def test_upload_ask_and_delete_document_lifecycle(
     app.dependency_overrides[get_ingestion_service] = lambda: ingestion_service
     app.dependency_overrides[get_chroma_service] = lambda: chroma_service
     app.dependency_overrides[get_rag_service] = lambda: rag_service
+    app.dependency_overrides[get_llm_model_registry] = FakeModelRegistry
 
     sample_pdf = Path("tests/data/sample.pdf")
     collection_name = "lifecycle-test"
@@ -171,6 +180,7 @@ def test_upload_ask_and_delete_document_lifecycle(
         assert ask_response.status_code == 200
         answer = ask_response.json()
         assert answer["answer"] == "Grounded test answer."
+        assert answer["model_id"] == "test:default"
         assert answer["sources"]
         assert answer["sources"][0]["document_id"] == document_id
         assert answer["sources"][0]["source"] == sample_pdf.name
@@ -247,5 +257,6 @@ def test_rag_returns_a_safe_response_when_retrieval_is_empty() -> None:
     assert response == {
         "question": "What is in this collection?",
         "answer": "No relevant document chunks were found in the selected collection.",
+        "model_id": None,
         "sources": [],
     }

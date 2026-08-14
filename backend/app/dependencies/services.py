@@ -1,6 +1,7 @@
 from fastapi import Request
 
 from app.services.llm.llm_service import LLMService
+from app.services.llm.model_registry import LLMModelRegistry
 from app.services.rag.rag_service import RAGService
 from app.services.vector.chroma_service import ChromaService
 from app.services.vector.embedding_service import EmbeddingService
@@ -18,6 +19,10 @@ def get_chroma_service(request: Request) -> ChromaService:
 
 def get_llm_service(request: Request) -> LLMService:
     return request.app.state.llm_service
+
+
+def get_llm_model_registry(request: Request) -> LLMModelRegistry:
+    return request.app.state.llm_model_registry
 
 
 def get_retrieval_service(request: Request) -> RetrievalService:

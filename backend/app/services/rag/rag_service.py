@@ -100,6 +100,7 @@ class RAGService:
         collection_name: str = "test_ingestion_bge",
         top_k: int = 5,
         document_id: str | None = None,
+        model_id: str | None = None,
     ) -> dict:
 
         retrieval_top_k = max(top_k, 12)
@@ -114,6 +115,7 @@ class RAGService:
             return {
                 "question": question,
                 "answer": "No relevant document chunks were found in the selected collection.",
+                "model_id": model_id,
                 "sources": [],
             }
 
@@ -132,6 +134,7 @@ class RAGService:
         return {
             "question": question,
             "answer": answer,
+            "model_id": model_id,
             "sources": [
                 {
                     **result["metadata"],

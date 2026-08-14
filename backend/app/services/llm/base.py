@@ -6,3 +6,7 @@ class LLMProvider(ABC):
     @abstractmethod
     def generate(self,messages: list[dict],) -> str:
         pass
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        pass

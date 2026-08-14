@@ -8,8 +8,7 @@ class RAGAskRequest(BaseModel):
     collection_name: str = "test_ingestion_bge"
     top_k: int = Field(default=5, ge=1, le=20)
     document_id: UUID | None = None
-    llm_provider: str = Field(default="ollama", pattern="^ollama$")
-    llm_model: str | None = Field(default=None, min_length=1, max_length=255)
+    model_id: str | None = Field(default=None, min_length=1, max_length=255)
 
 
 class RAGSource(BaseModel):
@@ -24,4 +23,5 @@ class RAGSource(BaseModel):
 class RAGAskResponse(BaseModel):
     question: str
     answer: str
+    model_id: str | None
     sources: list[RAGSource]

@@ -40,3 +40,16 @@ class OllamaProvider(LLMProvider):
             )
 
         return data["message"]["content"]
+
+    def is_available(self) -> bool:
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            response.raise_for_status()
+            models = response.json().get("models", [])
+        except requests.exceptions.RequestException:
+            return False
+
+        return any(
+            model.get("name") == self.model or model.get("model") == self.model
+            for model in models
+        )

@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.settings import settings
 from app.dependencies.database import get_db
-from app.dependencies.services import get_rag_service
+from app.dependencies.services import get_llm_model_registry, get_rag_service
 from app.repositories.document_repository import DocumentRepository
 from app.schemas.rag import RAGAskRequest, RAGAskResponse
 from app.services.llm.llm_service import LLMService
+from app.services.llm.model_registry import LLMModelRegistry
 from app.services.rag.rag_service import RAGService
 
 router = APIRouter(
@@ -22,6 +22,7 @@ router = APIRouter(
 def ask(
     request: RAGAskRequest,
     rag_service: RAGService = Depends(get_rag_service),
+    model_registry: LLMModelRegistry = Depends(get_llm_model_registry),
     db: Session = Depends(get_db),
 ):
     if request.document_id is not None:
@@ -40,12 +41,13 @@ def ask(
                 detail="The selected document is not ready for questions.",
             )
 
-    if request.llm_provider != settings.LLM_PROVIDER or request.llm_model is not None:
+    selected_model = model_registry.resolve(request.model_id)
+    if request.model_id is not None:
         rag_service = RAGService(
             retrieval_service=rag_service.retrieval_service,
             llm_service=LLMService(
-                provider=request.llm_provider,
-                model=request.llm_model or settings.LLM_MODEL,
+                provider=selected_model.provider,
+                model=selected_model.model,
             ),
         )
 
@@ -54,4 +56,5 @@ def ask(
         collection_name=request.collection_name,
         top_k=request.top_k,
         document_id=str(request.document_id) if request.document_id is not None else None,
+        model_id=selected_model.id,
     )

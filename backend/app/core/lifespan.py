@@ -4,6 +4,7 @@ from app.core.settings import settings
 from app.services.vector.embedding_service import EmbeddingService
 from app.services.vector.chroma_service import ChromaService
 from app.services.llm.llm_service import LLMService
+from app.services.llm.model_registry import LLMModelRegistry
 from app.services.document.ingestion_service import DocumentIngestionService
 
 
@@ -26,15 +27,13 @@ async def lifespan(app):
     # --------------------------------------------------
     # Shared LLM service
     # --------------------------------------------------
-    print(
-        f"Configuring LLM: "
-        f"{settings.LLM_PROVIDER} / "
-        f"{settings.LLM_MODEL}"
-    )
+    llm_model_registry = LLMModelRegistry()
+    default_model = llm_model_registry.resolve()
+    print(f"Configuring LLM: {default_model.provider} / {default_model.model}")
 
     llm_service = LLMService(
-        provider=settings.LLM_PROVIDER,
-        model=settings.LLM_MODEL,
+        provider=default_model.provider,
+        model=default_model.model,
     )
 
 
@@ -51,6 +50,7 @@ async def lifespan(app):
 
     app.state.embedding_service = embedding_service
     app.state.llm_service = llm_service
+    app.state.llm_model_registry = llm_model_registry
     app.state.chroma_service = chroma_service
     app.state.document_ingestion_service = document_ingestion_service
 
