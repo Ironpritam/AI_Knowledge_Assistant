@@ -1,4 +1,5 @@
 import chromadb
+from pathlib import Path
 
 from app.core.constants import VECTOR_DB_DIR
 
@@ -20,9 +21,9 @@ from app.core.constants import VECTOR_DB_DIR
 
 class ChromaService:
 
-    def __init__(self):
+    def __init__(self, persist_directory: Path | None = None):
         self.client = chromadb.PersistentClient(
-            path=str(VECTOR_DB_DIR)
+            path=str(persist_directory or VECTOR_DB_DIR)
         )
 
     def get_collection(self,
@@ -77,7 +78,14 @@ class ChromaService:
         embeddings: list[list[float]],
     ) -> None:
 
-        ids = [f"{chunk['metadata']['source']}_{chunk['metadata']['chunk_index']}" for chunk in chunks]
+        ids = [
+            (
+                f"{chunk['metadata']['document_id']}_{chunk['metadata']['chunk_index']}"
+                if "document_id" in chunk["metadata"]
+                else f"{chunk['metadata']['source']}_{chunk['metadata']['chunk_index']}"
+            )
+            for chunk in chunks
+        ]
         documents = [chunk["text"] for chunk in chunks]
         metadatas = [chunk["metadata"] for chunk in chunks]
 
@@ -92,12 +100,17 @@ class ChromaService:
         collection,
         query_embedding: list[float],
         top_k: int = 5,
+        where: dict | None = None,
     ) -> list[dict]:
 
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=top_k,
-        )
+        query_args = {
+            "query_embeddings": [query_embedding],
+            "n_results": top_k,
+        }
+        if where is not None:
+            query_args["where"] = where
+
+        results = collection.query(**query_args)
 
         return [
             {
@@ -114,3 +127,11 @@ class ChromaService:
 
     def count(self, collection) -> int:
         return collection.count()
+
+    def delete_document_chunks(
+        self,
+        collection_name: str,
+        document_id: str,
+    ) -> None:
+        collection = self.client.get_collection(name=collection_name)
+        collection.delete(where={"document_id": document_id})

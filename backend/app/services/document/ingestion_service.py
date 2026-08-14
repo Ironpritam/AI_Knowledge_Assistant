@@ -55,12 +55,22 @@ class DocumentIngestionService:
     #         "vector_count": self.vector_store.count(),
     #     }
 
-    def ingest(self, pdf_path: Path, collection_name: str = "documents",) -> dict:
+    def ingest(
+        self,
+        pdf_path: Path,
+        collection_name: str = "test_ingestion_bge",
+        document_id: str | None = None,
+        source_filename: str | None = None,
+    ) -> dict:
         pdf_data = PDFService.extract_document(pdf_path)
         chunks = self.chunker.chunk_pages(
             pages=pdf_data["pages"],
-            source_filename=pdf_path.name,
+            source_filename=source_filename or pdf_path.name,
         )
+
+        if document_id is not None:
+            for chunk in chunks:
+                chunk["metadata"]["document_id"] = document_id
 
         texts = [chunk["text"]for chunk in chunks]
         embeddings = self.embedding_service.embed_documents(texts)
@@ -83,5 +93,5 @@ class DocumentIngestionService:
             "chunk_count": len(chunks),
             "embedding_model": self.embedding_service.model_key,
             "embedding_dimension": self.embedding_service.dimension,
-            "vector_count": self.chroma_service.count(collection),
+            "vector_count": len(embeddings),
         }

@@ -12,6 +12,7 @@ class RetrievalService:
         query: str,
         collection_name: str = "documents",
         top_k: int = 5,
+        document_id: str | None = None,
     ):
         collection = self.chroma_service.get_collection(
             collection_name=collection_name,
@@ -24,5 +25,6 @@ class RetrievalService:
             collection=collection,
             query_embedding=query_embedding,
             top_k=top_k,
+            where={"document_id": document_id} if document_id is not None else None,
         )
         return results

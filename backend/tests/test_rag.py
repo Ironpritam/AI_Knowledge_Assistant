@@ -4,6 +4,34 @@ from app.services.vector.chroma_service import ChromaService
 from app.services.vector.retrieval_service import RetrievalService
 from app.services.llm.llm_service import LLMService
 
+
+def test_rag_context_groups_chunks_by_page():
+    rag = RAGService(retrieval_service=None, llm_service=None)
+
+    results = [
+        {
+            "text": "Target audience includes executive leadership.",
+            "metadata": {"source": "cloud-governance.pdf", "page": 10, "chunk_index": 26},
+        },
+        {
+            "text": "C-suite leaders set strategy and align governance to business goals.",
+            "metadata": {"source": "cloud-governance.pdf", "page": 10, "chunk_index": 27},
+        },
+        {
+            "text": "The board approves major policy decisions.",
+            "metadata": {"source": "cloud-governance.pdf", "page": 11, "chunk_index": 2},
+        },
+    ]
+
+    context = rag._build_context(results)
+
+    assert "Target audience includes executive leadership." in context
+    assert "C-suite leaders set strategy and align governance to business goals." in context
+    assert "Page: 10" in context
+    assert "Page: 11" in context
+    assert context.count("[Source ") == 2
+
+
 embedding_service = EmbeddingService(model_name="bge-small")
 
 chroma_service = ChromaService()

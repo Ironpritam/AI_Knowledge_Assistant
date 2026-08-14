@@ -21,16 +21,50 @@ class RAGService:
         self.llm_service = llm_service
 
     def _build_context(self,results: list[dict],) -> str:
-        context_parts = []
-        for index, result in enumerate(results,start=1,):
+        grouped_by_page: dict[tuple[str, int], list[dict]] = {}
+
+        for result in results:
             metadata = result["metadata"]
+            page_key = (
+                metadata.get("source", "unknown"),
+                int(metadata.get("page", 0)),
+            )
+            grouped_by_page.setdefault(page_key, []).append(result)
+
+        context_parts = []
+        for index, ((source, page), page_results) in enumerate(
+            sorted(
+                grouped_by_page.items(),
+                key=lambda item: (item[0][0], item[0][1]),
+            ),
+            start=1,
+        ):
+            ordered_chunks = sorted(
+                page_results,
+                key=lambda item: int(item["metadata"].get("chunk_index", 0)),
+            )
+            page_text = "\n\n".join(
+                chunk["text"].strip()
+                for chunk in ordered_chunks
+                if chunk.get("text")
+            ).strip()
+
+            if not page_text:
+                continue
+
+            chunk_numbers = ", ".join(
+                str(int(chunk["metadata"].get("chunk_index", 0)))
+                for chunk in ordered_chunks
+            )
+
             context_parts.append(
                 f"[Source {index}]\n"
-                f"Document: {metadata['source']}\n"
-                f"Page: {metadata['page']}\n"
-                f"Chunk: {metadata['chunk_index']}\n\n"
-                f"{result['text']}"
+                f"Document: {source}\n"
+                f"Page: {page}\n"
+                f"Chunks: {chunk_numbers}\n\n"
+                f"{page_text}"
             )
+
         return "\n\n---\n\n".join(context_parts)
 
     def _build_prompt(self,question: str,context: str,) -> str:
@@ -43,8 +77,9 @@ class RAGService:
             1. Do not use outside knowledge.
             2. If the answer cannot be found in the context, say that the information is not available in the provided document.
             3. Do not invent facts.
-            4. Give a concise, direct answer.
-            5. When possible, mention the relevant source page.
+            4. Give a complete answer that covers the key points, not a fragmentary response.
+            5. Use 2-5 sentences or a short bullet list when it helps explain clearly.
+            6. When possible, mention the relevant source page.
 
             Context:
 
@@ -62,15 +97,26 @@ class RAGService:
     
     def ask(self,
         question: str,
-        collection_name: str = "documents",
+        collection_name: str = "test_ingestion_bge",
         top_k: int = 5,
+        document_id: str | None = None,
     ) -> dict:
 
+        retrieval_top_k = max(top_k, 12)
         retrieved_chunks = self.retrieval_service.retrieve(
             query=question,
             collection_name=collection_name,
-            top_k=top_k,
+            top_k=retrieval_top_k,
+            document_id=document_id,
         )
+
+        if not retrieved_chunks:
+            return {
+                "question": question,
+                "answer": "No relevant document chunks were found in the selected collection.",
+                "sources": [],
+            }
+
         context = self._build_context(retrieved_chunks)
 
         prompt = self._build_prompt(question=question,context=context,)
@@ -87,7 +133,11 @@ class RAGService:
             "question": question,
             "answer": answer,
             "sources": [
-                result["metadata"]
-                for result in retrieved_chunks
+                {
+                    **result["metadata"],
+                    "collection_name": collection_name,
+                    "distance": result["distance"],
+                }
+                for result in retrieved_chunks[:top_k]
             ],
         }
