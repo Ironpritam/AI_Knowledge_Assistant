@@ -1,122 +1,240 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useCallback, useEffect, useState } from "react";
+
+import "./App.css";
+import {
+  documentApi,
+  healthApi,
+  modelApi,
+} from "./services/api";
+
+import DocumentList from "./components/documents/DocumentList";
+import DocumentUploader from "./components/documents/DocumentUploader";
+import ChatPanel from "./components/chat/ChatPanel";
+
+const COLLECTION_NAME =
+  import.meta.env.VITE_RAG_COLLECTION_NAME || "test_ingestion_bge";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [documents, setDocuments] = useState([]);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState("");
+
+  const [systemHealth, setSystemHealth] = useState({
+    status: "offline",
+    components: {},
+  });
+  
+  const [uploading, setUploading] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(true);
+
+  const [error, setError] = useState("");
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      setLoadingDocuments(true);
+      const response = await documentApi.list();
+      setDocuments(response.data);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Unable to load documents."
+      );
+    } finally {
+      setLoadingDocuments(false);
+    }
+  }, []);
+
+  const loadModels = useCallback(async () => {
+    try {
+      const response = await modelApi.list();
+
+      const availableModels = response.data.models.filter(
+        (model) => model.enabled
+      );
+
+      setModels(availableModels);
+
+      const defaultModel =
+        response.data.default_model_id ||
+        availableModels.find((model) => model.default)?.id ||
+        availableModels[0]?.id ||
+        "";
+
+      setSelectedModel(defaultModel);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Unable to load available models."
+      );
+    }
+  }, []);
+
+const checkHealth = useCallback(async () => {
+  try {
+    const response = await healthApi.check();
+
+    setSystemHealth({
+      status: response.data.status,
+      components: response.data.components || {},
+    });
+
+  } catch (err) {
+    // Backend responded with a health status such as "unhealthy"
+    // but used HTTP 503.
+    if (err.response?.data?.status) {
+      setSystemHealth({
+        status: err.response.data.status,
+        components: err.response.data.components || {},
+      });
+      return;
+    }
+
+    // No HTTP response means the backend is unreachable.
+    setSystemHealth({
+      status: "offline",
+      components: {},
+    });
+  }
+}, []);
+
+useEffect(() => {
+  const initializeApp = async () => {
+    await Promise.allSettled([
+      loadDocuments(),
+      loadModels(),
+      checkHealth(),
+    ]);
+  };
+
+  initializeApp();
+}, [loadDocuments, loadModels, checkHealth]);
+
+  const handleUpload = async (file) => {
+    try {
+      setUploading(true);
+      setError("");
+
+      const response = await documentApi.upload(
+        file,
+        COLLECTION_NAME
+      );
+
+      const uploadedDocument = response.data;
+
+      await loadDocuments();
+
+      setSelectedDocument(uploadedDocument);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Document upload failed."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (document) => {
+    const confirmed = window.confirm(
+      `Delete "${document.original_filename}"?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError("");
+
+      await documentApi.remove(document.id);
+
+      if (selectedDocument?.id === document.id) {
+        setSelectedDocument(null);
+      }
+
+      await loadDocuments();
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          "Unable to delete the document."
+      );
+    }
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
+    <div className="app-shell">
+      <header className="app-header">
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <h1>AI Knowledge Assistant</h1>
+          <p>Ask questions about your documents</p>
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        <div className="header-status">
+          <span
+            className={`status-dot ${systemHealth.status}`}
+          />
+          <span>
+            {systemHealth.status === "healthy" && "System healthy"}
+            {systemHealth.status === "degraded" && "System degraded"}
+            {systemHealth.status === "unhealthy" && "System unhealthy"}
+            {systemHealth.status === "offline" && "Backend offline"}
+          </span>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      </header>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {error && (
+        <div className="app-error">
+          <span>{error}</span>
+
+          <button onClick={() => setError("")}>
+            ×
+          </button>
+        </div>
+      )}
+
+      <main className="app-main">
+        <aside className="sidebar">
+          <div className="section-header">
+            <div>
+              <h2>Knowledge Base</h2>
+              <span>
+                {documents.length} document
+                {documents.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+
+          <DocumentUploader
+            onUpload={handleUpload}
+            disabled={uploading}
+          />
+
+          <div className="document-list-container">
+            {loadingDocuments ? (
+              <div className="empty-state">
+                <p>Loading documents...</p>
+              </div>
+            ) : (
+              <DocumentList
+                documents={documents}
+                selectedDocument={selectedDocument}
+                onSelect={setSelectedDocument}
+                onDelete={handleDelete}
+              />
+            )}
+          </div>
+        </aside>
+
+        <ChatPanel
+          key={selectedDocument?.id || "no-document"}
+          selectedDocument={selectedDocument}
+          models={models}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          collectionName={COLLECTION_NAME}
+        />
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
