@@ -28,7 +28,7 @@ async def lifespan(app):
     # Shared LLM service
     # --------------------------------------------------
     llm_model_registry = LLMModelRegistry()
-    default_model = llm_model_registry.resolve()
+    default_model = llm_model_registry.resolve(check_availability=False)
     print(f"Configuring LLM: {default_model.provider} / {default_model.model}")
 
     llm_service = LLMService(

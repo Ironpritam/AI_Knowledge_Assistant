@@ -20,6 +20,7 @@ class DocumentUploadResponse(BaseModel):
     original_filename: str
     stored_filename: str
     collection_name: str
+    status: str
 
     page_count: int
     chunk_count: int

@@ -5,9 +5,9 @@ from pydantic import BaseModel, Field
 
 class RAGAskRequest(BaseModel):
     question: str = Field(..., min_length=1)
-    collection_name: str = "test_ingestion_bge"
+    collection_name: str = "test_all_0.0.0.0"
     top_k: int = Field(default=5, ge=1, le=20)
-    document_id: UUID | None = None
+    document_ids: list[UUID] = Field(default_factory=list)
     model_id: str | None = Field(default=None, min_length=1, max_length=255)
 
 

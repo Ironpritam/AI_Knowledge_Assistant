@@ -1,5 +1,8 @@
-from fastapi import Request
+from fastapi import Depends,Request
 
+from sqlalchemy.orm import Session
+
+from app.dependencies.database import get_db
 from app.services.llm.llm_service import LLMService
 from app.services.llm.model_registry import LLMModelRegistry
 from app.services.rag.rag_service import RAGService
@@ -21,8 +24,11 @@ def get_llm_service(request: Request) -> LLMService:
     return request.app.state.llm_service
 
 
-def get_llm_model_registry(request: Request) -> LLMModelRegistry:
-    return request.app.state.llm_model_registry
+def get_llm_model_registry(request: Request,
+    db: Session = Depends(get_db),
+) -> LLMModelRegistry:
+
+    return LLMModelRegistry(db=db, app_settings=request.app.state.llm_model_registry.settings)
 
 
 def get_retrieval_service(request: Request) -> RetrievalService:
@@ -32,10 +38,11 @@ def get_retrieval_service(request: Request) -> RetrievalService:
     )
 
 
-def get_rag_service(request: Request) -> RAGService:
+def get_rag_service(request: Request, db: Session = Depends(get_db)) -> RAGService:
     return RAGService(
         retrieval_service=get_retrieval_service(request),
         llm_service=get_llm_service(request),
+        db=db,
     )
 
 def get_ingestion_service(request: Request,) -> DocumentIngestionService:

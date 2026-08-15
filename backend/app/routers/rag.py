@@ -25,36 +25,47 @@ def ask(
     model_registry: LLMModelRegistry = Depends(get_llm_model_registry),
     db: Session = Depends(get_db),
 ):
-    if request.document_id is not None:
-        document = DocumentRepository(db).get_by_id(request.document_id)
-
-        if document is None:
-            raise HTTPException(status_code=404, detail="Document not found.")
-        if document.collection_name != request.collection_name:
-            raise HTTPException(
-                status_code=400,
-                detail="The selected document does not belong to this collection.",
-            )
-        if document.status != "processed":
-            raise HTTPException(
-                status_code=409,
-                detail="The selected document is not ready for questions.",
-            )
-
-    selected_model = model_registry.resolve(request.model_id)
-    if request.model_id is not None:
-        rag_service = RAGService(
-            retrieval_service=rag_service.retrieval_service,
-            llm_service=LLMService(
-                provider=selected_model.provider,
-                model=selected_model.model,
-            ),
+    if request.document_ids:
+        documents = DocumentRepository.get_all(
+            request.document_ids
         )
+
+        if len(documents) != len(set(request.document_ids)):
+            raise HTTPException(
+                status_code=404,
+                detail="One or more requested documents were not found."
+            )
+
+        for document in documents:
+            if document.collection_name != request.collection_name:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Document {document.id} does not belong "
+                        f"to collection '{request.collection_name}'."
+                    ),
+                )
+
+            if document.status != "processed":
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Document {document.id} is not processed.",
+                )
+            
+    selected_model = model_registry.resolve(request.model_id)
+    rag_service = RAGService(
+        retrieval_service=rag_service.retrieval_service,
+        llm_service=LLMService(
+            provider=selected_model.provider,
+            model=selected_model.model,
+        ),
+        db=db,
+    )
 
     return rag_service.ask(
         question=request.question,
         collection_name=request.collection_name,
         top_k=request.top_k,
-        document_id=str(request.document_id) if request.document_id is not None else None,
+        document_ids=[str(doc.id) for doc in documents] if request.document_ids else None,
         model_id=selected_model.id,
     )

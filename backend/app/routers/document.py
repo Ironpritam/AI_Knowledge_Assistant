@@ -32,7 +32,7 @@ ALLOWED_EXTENSIONS = {".pdf"}
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
-    collection_name: str = Query("test_ingestion_bge"),
+    collection_name: str = Query("test_all_0.0.0.0"),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
     db: Session = Depends(get_db),
 ):
@@ -98,6 +98,7 @@ async def upload_document(
         "original_filename": file.filename,
         "stored_filename": stored_filename,
         "collection_name": collection_name,
+        "status": document.status,
         **result,
     }
 
@@ -135,6 +136,19 @@ def delete_document(
 
     try:
         if previous_status == "processed":
+            # Verify chunks exist before attempting deletion
+            chunk_count = chroma_service.get_document_chunks_count(
+                collection_name=document.collection_name,
+                document_id=str(document.id),
+            )
+            
+            if chunk_count == 0:
+                logger.warning(
+                    f"No chunks found for document {document.id} in collection {document.collection_name}. "
+                    f"Document may have already been deleted or was never indexed."
+                )
+            
+            # Delete from vector database
             chroma_service.delete_document_chunks(
                 collection_name=document.collection_name,
                 document_id=str(document.id),

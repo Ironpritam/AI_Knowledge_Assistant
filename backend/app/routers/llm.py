@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.dependencies.services import get_llm_model_registry
-from app.schemas.llm import LLMModelsResponse
+from app.schemas.llm import LLMModelsResponse, LLMModelStatusResponse
 from app.services.llm.model_registry import LLMModelRegistry
 
 
@@ -19,3 +19,10 @@ def list_models(
         "default_model_id": model_registry.default_model_id,
         "models": model_registry.list_models(),
     }
+
+@router.get("/models/{model_id:path}/status", response_model=LLMModelStatusResponse)
+def get_model_status(
+    model_id: str,
+    model_registry: LLMModelRegistry = Depends(get_llm_model_registry),
+):
+    return model_registry.get_status(model_id)

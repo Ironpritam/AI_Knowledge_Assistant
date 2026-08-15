@@ -128,10 +128,67 @@ class ChromaService:
     def count(self, collection) -> int:
         return collection.count()
 
+    def get_document_chunks_count(
+        self,
+        collection_name: str,
+        document_id: str,
+    ) -> int:
+        """
+        Get the count of chunks for a specific document in the collection.
+        
+        Args:
+            collection_name: Name of the collection
+            document_id: Document ID to count chunks for
+            
+        Returns:
+            Number of chunks found for the document
+        """
+        try:
+            collection = self.client.get_collection(name=collection_name)
+            # Query with the where filter to count matching documents
+            results = collection.get(where={"document_id": document_id})
+            return len(results.get("ids", []))
+        except Exception:
+            return 0
+
     def delete_document_chunks(
         self,
         collection_name: str,
         document_id: str,
     ) -> None:
-        collection = self.client.get_collection(name=collection_name)
-        collection.delete(where={"document_id": document_id})
+        """
+        Delete all chunks for a specific document from ChromaDB.
+        
+        Uses document_id in metadata to identify chunks to delete.
+        
+        Args:
+            collection_name: Name of the collection
+            document_id: Document ID to delete chunks for
+            
+        Raises:
+            ValueError: If collection doesn't exist or delete fails
+        """
+        try:
+            collection = self.client.get_collection(name=collection_name)
+            
+            # Count chunks before deletion (for logging)
+            count_before = collection.count()
+            
+            # Delete chunks where document_id matches
+            collection.delete(where={"document_id": document_id})
+            
+            # Verify deletion
+            count_after = collection.count()
+            deleted_count = count_before - count_after
+            
+            if deleted_count == 0:
+                raise ValueError(
+                    f"No chunks deleted for document {document_id} in collection {collection_name}. "
+                    f"This may indicate the document_id was not stored in chunk metadata."
+                )
+                
+        except Exception as exc:
+            raise ValueError(
+                f"Failed to delete document chunks for {document_id} "
+                f"in collection {collection_name}: {str(exc)}"
+            ) from exc

@@ -8,6 +8,7 @@ from alembic import context
 from app.database.base import Base
 from app.core.settings import settings
 from app.models.document import Document
+from app.models.llm_model import LLMModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
