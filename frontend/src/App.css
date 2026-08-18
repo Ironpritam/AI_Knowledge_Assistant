@@ -1,7 +1,20 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: #f8fafc;
   color: #0f172a;
 }
@@ -51,15 +64,18 @@
 }
 
 .app-main {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 320px 1fr;
+  flex: 1 1 auto;
   min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .sidebar {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   border-right: 1px solid #e2e8f0;
   background: #ffffff;
 }
@@ -112,103 +128,6 @@
   line-height: 1.5;
 }
 
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.chat-header {
-  height: 74px;
-  padding: 0 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.chat-header h2 {
-  font-size: 16px;
-}
-
-.chat-header select {
-  min-width: 180px;
-  padding: 9px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 7px;
-  background: #ffffff;
-  color: #334155;
-}
-
-.chat-content {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-}
-
-.chat-empty-state {
-  max-width: 420px;
-  text-align: center;
-}
-
-.chat-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: #e2e8f0;
-  font-size: 22px;
-}
-
-.chat-empty-state h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-}
-
-.chat-empty-state p {
-  margin: 0;
-  color: #64748b;
-  line-height: 1.6;
-}
-
-.chat-input-area {
-  display: flex;
-  gap: 10px;
-  padding: 18px 28px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8f0;
-}
-
-.chat-input-area input {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font: inherit;
-}
-
-.chat-input-area button {
-  padding: 0 20px;
-  border: 0;
-  border-radius: 8px;
-  background: #0f172a;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-.chat-input-area button:disabled,
-.chat-input-area input:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 @media (max-width: 800px) {
   .app-main {
     grid-template-columns: 1fr;
@@ -216,12 +135,6 @@
 
   .sidebar {
     display: none;
-  }
-
-  .chat-header,
-  .chat-input-area {
-    padding-left: 16px;
-    padding-right: 16px;
   }
 }
 .document-list {
@@ -383,6 +296,10 @@
   background: #94a3b8;
 }
 
+.status-dot.unknown {
+  background: #94a3b8;
+}
+
 .app-error {
   display: flex;
   align-items: center;
@@ -412,4 +329,221 @@
 
 .document-list-container .document-list {
   padding: 0;
+}
+.document-selection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.document-selection-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+}
+
+.document-selection-toolbar input,
+.document-selection {
+  cursor: pointer;
+}
+
+.document-selection-toolbar button {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.document-selection-toolbar button:hover {
+  color: #0f172a;
+}
+
+.document-selection {
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.document-selection input {
+  width: 16px;
+  height: 16px;
+}
+
+.document-card {
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.document-card:hover {
+  border-color: #94a3b8;
+}
+
+.document-card.selected {
+  border-color: #334155;
+  box-shadow: 0 0 0 1px #334155;
+}
+
+.document-card:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+
+.document-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.document-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-indicator {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+}
+
+.selection-indicator.checked {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.document-status.processing {
+  color: #b45309;
+}
+
+.document-status.failed {
+  color: #dc2626;
+}
+
+.document-status.pending {
+  color: #64748b;
+}
+
+.upload-area.disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.upload-validation-error {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.upload-validation-error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.health-wrapper {
+  position: relative;
+}
+
+.health-indicator {
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 14px;
+}
+
+.health-indicator:hover {
+  background: #f8fafc;
+  border-radius: 6px;
+}
+
+.health-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  padding: 14px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  display: none;
+  z-index: 100;
+}
+
+.health-wrapper:hover .health-popover,
+.health-wrapper:focus-within .health-popover {
+  display: block;
+}
+
+.health-popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.health-badge {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: capitalize;
+  background: #f1f5f9;
+}
+
+.health-components {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.health-component {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.health-component > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.health-component-status {
+  color: #64748b;
+  font-size: 12px;
+  text-transform: capitalize;
 }

@@ -7,16 +7,21 @@ import {
   modelApi,
 } from "./services/api";
 
+import HealthIndicator from "./components/common/HealthIndicator";
 import DocumentList from "./components/documents/DocumentList";
 import DocumentUploader from "./components/documents/DocumentUploader";
 import ChatPanel from "./components/chat/ChatPanel";
+
 
 const COLLECTION_NAME =
   import.meta.env.VITE_RAG_COLLECTION_NAME || "test_ingestion_bge";
 
 function App() {
   const [documents, setDocuments] = useState([]);
-  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState([]);
+  const selectedDocuments = documents.filter((document) =>
+    selectedDocumentIds.includes(document.id)
+  );
 
   const [models, setModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -111,21 +116,38 @@ useEffect(() => {
   initializeApp();
 }, [loadDocuments, loadModels, checkHealth]);
 
+
+  const handleDocumentSelect = (document) => {
+    setSelectedDocumentIds((current) => {
+      if (current.includes(document.id)) {
+        return current.filter((id) => id !== document.id);
+      }
+
+      return [...current, document.id];
+    });
+  };
+
+  const handleSelectAllDocuments = () => {
+    setSelectedDocumentIds(
+      documents.map((document) => document.id)
+    );
+  };
+
+  const handleClearDocumentSelection = () => {
+    setSelectedDocumentIds([]);
+  };
+
   const handleUpload = async (file) => {
     try {
       setUploading(true);
       setError("");
 
-      const response = await documentApi.upload(
+      await documentApi.upload(
         file,
         COLLECTION_NAME
       );
 
-      const uploadedDocument = response.data;
-
       await loadDocuments();
-
-      setSelectedDocument(uploadedDocument);
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -148,11 +170,10 @@ useEffect(() => {
 
       await documentApi.remove(document.id);
 
-      if (selectedDocument?.id === document.id) {
-        setSelectedDocument(null);
-      }
-
       await loadDocuments();
+      setSelectedDocumentIds((current) =>
+        current.filter((id) => id !== document.id)
+      );
     } catch (err) {
       setError(
         err.response?.data?.detail ||
@@ -168,17 +189,7 @@ useEffect(() => {
           <h1>AI Knowledge Assistant</h1>
           <p>Ask questions about your documents</p>
         </div>
-        <div className="header-status">
-          <span
-            className={`status-dot ${systemHealth.status}`}
-          />
-          <span>
-            {systemHealth.status === "healthy" && "System healthy"}
-            {systemHealth.status === "degraded" && "System degraded"}
-            {systemHealth.status === "unhealthy" && "System unhealthy"}
-            {systemHealth.status === "offline" && "Backend offline"}
-          </span>
-        </div>
+        <HealthIndicator health={systemHealth} />
       </header>
 
       {error && (
@@ -214,19 +225,21 @@ useEffect(() => {
                 <p>Loading documents...</p>
               </div>
             ) : (
-              <DocumentList
-                documents={documents}
-                selectedDocument={selectedDocument}
-                onSelect={setSelectedDocument}
-                onDelete={handleDelete}
-              />
+                <DocumentList
+                  documents={documents}
+                  selectedDocumentIds={selectedDocumentIds}
+                  onSelect={handleDocumentSelect}
+                  onSelectAll={handleSelectAllDocuments}
+                  onClearSelection={handleClearDocumentSelection}
+                  onDelete={handleDelete}
+                />
             )}
           </div>
         </aside>
 
         <ChatPanel
-          key={selectedDocument?.id || "no-document"}
-          selectedDocument={selectedDocument}
+          selectedDocuments={selectedDocuments}
+          allDocuments={documents}
           models={models}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}

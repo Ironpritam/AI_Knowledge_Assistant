@@ -1,7 +1,24 @@
-import { useState } from "react";
+import React, { useEffect, useRef } from "react";
 
-function ChatInput({ onSend, disabled = false }) {
-  const [value, setValue] = useState("");
+function ChatInput({
+  onSend,
+  disabled = false,
+  placeholder = "Ask something about your documents...",
+}) {
+  const [value, setValue] = React.useState("");
+  const textareaRef = useRef(null);
+
+  const resizeTextarea = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+  };
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [value]);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -26,12 +43,14 @@ function ChatInput({ onSend, disabled = false }) {
   return (
     <form className="chat-input-area" onSubmit={handleSubmit}>
       <textarea
+        ref={textareaRef}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Ask something about your documents..."
+        placeholder={placeholder}
         disabled={disabled}
         rows={1}
+        aria-label="Ask a question"
       />
 
       <button
