@@ -63,7 +63,19 @@ class FakeModelRegistry:
     default_model_id = "test:default"
 
     def resolve(self, model_id: str | None = None):
-        return type("Model", (), {"id": model_id or self.default_model_id})()
+        resolved_id = model_id or self.default_model_id
+        return type(
+            "Model",
+            (),
+            {
+                "id": resolved_id,
+                "label": "Test model",
+                "provider": "ollama",
+                "model": "qwen3:8b",
+                "enabled": True,
+                "is_default": True,
+            },
+        )()
 
 
 class FailingIngestionService:
@@ -211,6 +223,74 @@ def test_upload_ask_and_delete_document_lifecycle(
         assert not Path(document.file_path).exists()
         assert collection.get(where={"document_id": document_id})["ids"] == []
         assert database_session.get(Document, other_document_id) is not None
+
+
+def test_ask_with_multiple_document_ids_works(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    database_session: Session,
+) -> None:
+    upload_directory = tmp_path / "uploads"
+    upload_directory.mkdir()
+    monkeypatch.setattr(document_router_module, "UPLOAD_DIR", upload_directory)
+
+    embedding_service = FakeEmbeddingService()
+    chroma_service = ChromaService(persist_directory=tmp_path / "chroma")
+    ingestion_service = DocumentIngestionService(
+        embedding_service=embedding_service,
+        chroma_service=chroma_service,
+    )
+    rag_service = RAGService(
+        retrieval_service=RetrievalService(embedding_service, chroma_service),
+        llm_service=FakeLLMService(),
+    )
+
+    app = FastAPI()
+    app.include_router(document_router)
+    app.include_router(rag_router)
+    app.dependency_overrides[get_db] = lambda: database_session
+    app.dependency_overrides[get_ingestion_service] = lambda: ingestion_service
+    app.dependency_overrides[get_chroma_service] = lambda: chroma_service
+    app.dependency_overrides[get_rag_service] = lambda: rag_service
+    app.dependency_overrides[get_llm_model_registry] = FakeModelRegistry
+
+    sample_pdf = Path("tests/data/sample.pdf")
+    collection_name = "multi-doc-test"
+
+    with TestClient(app) as client, sample_pdf.open("rb") as file_one, sample_pdf.open("rb") as file_two:
+        first_upload = client.post(
+            "/api/v1/documents/upload",
+            params={"collection_name": collection_name},
+            files={"file": ("one.pdf", file_one, "application/pdf")},
+        )
+        second_upload = client.post(
+            "/api/v1/documents/upload",
+            params={"collection_name": collection_name},
+            files={"file": ("two.pdf", file_two, "application/pdf")},
+        )
+
+    assert first_upload.status_code == 200
+    assert second_upload.status_code == 200
+
+    first_id = first_upload.json()["document_id"]
+    second_id = second_upload.json()["document_id"]
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/rag/ask",
+            json={
+                "question": "What is this document about?",
+                "collection_name": collection_name,
+                "document_ids": [first_id, second_id],
+                "top_k": 1,
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["question"] == "What is this document about?"
+    assert isinstance(body["answer"], str) and body["answer"]
+    assert len(body["sources"]) >= 1
 
 
 def test_failed_upload_keeps_a_failed_record_and_cleans_the_file(

@@ -43,6 +43,7 @@ def get_rag_service(request: Request, db: Session = Depends(get_db)) -> RAGServi
         retrieval_service=get_retrieval_service(request),
         llm_service=get_llm_service(request),
         db=db,
+        query_router=request.app.state.query_router,
     )
 
 def get_ingestion_service(request: Request,) -> DocumentIngestionService:

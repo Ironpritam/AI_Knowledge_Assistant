@@ -23,9 +23,14 @@ class DocumentRepository:
             .first()
         )
 
-    def get_all(self) -> list[Document]:
+    def get_all(self, document_ids: list[UUID] | None = None) -> list[Document]:
+        query = self.db.query(Document)
+
+        if document_ids:
+            query = query.filter(Document.id.in_(document_ids))
+
         return (
-            self.db.query(Document)
+            query
             .order_by(Document.created_at.desc())
             .all()
         )

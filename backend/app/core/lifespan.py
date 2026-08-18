@@ -6,8 +6,9 @@ from app.services.vector.chroma_service import ChromaService
 from app.services.llm.llm_service import LLMService
 from app.services.llm.model_registry import LLMModelRegistry
 from app.services.document.ingestion_service import DocumentIngestionService
+from app.services.rag.query_router import QueryIntentRouter
 
-
+print(f"Using embedding model: {settings.EMBEDDING_MODEL}")
 
 @asynccontextmanager
 async def lifespan(app):
@@ -21,6 +22,7 @@ async def lifespan(app):
         f"Loading embedding model: "
         f"{settings.EMBEDDING_MODEL}"
     )
+
     embedding_service = EmbeddingService(model_name=settings.EMBEDDING_MODEL)
 
 
@@ -48,11 +50,18 @@ async def lifespan(app):
         chroma_service=chroma_service,
     )
 
+    query_router = QueryIntentRouter(
+        embedding_service=embedding_service,
+        conversation_threshold=0.55,
+        document_threshold=0.55,
+    )
+
     app.state.embedding_service = embedding_service
     app.state.llm_service = llm_service
     app.state.llm_model_registry = llm_model_registry
     app.state.chroma_service = chroma_service
     app.state.document_ingestion_service = document_ingestion_service
+    app.state.query_router = query_router
 
     print("✅ AI Knowledge Assistant ready")
     yield

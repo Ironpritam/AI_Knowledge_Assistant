@@ -4,27 +4,21 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app.models.document import Document
+from app.services.rag.query_router import (QueryIntent,QueryIntentRouter,)
 
 
 class RAGService:
-    # def __init__(self,
-    #     embedding_model: str = "bge-small",
-    #     llm_provider: str = "ollama",
-    #     llm_model: str = "qwen3:8b",
-    #     collection_name: str = "documents",
-    # ):
-        
-    #     self.retriever = RetrievalService(embedding_model=embedding_model,collection_name=collection_name,)
-    #     self.llm = LLMService(provider=llm_provider,model=llm_model,)
-
-    def __init__(self,
+    def __init__(
+        self,
         retrieval_service,
         llm_service,
         db: Session | None = None,
+        query_router: QueryIntentRouter | None = None,
     ):
         self.retrieval_service = retrieval_service
         self.llm_service = llm_service
         self.db = db
+        self.query_router = query_router
 
     def _build_context(self,results: list[dict],) -> str:
         grouped_by_page: dict[tuple[str, int], list[dict]] = {}
@@ -133,7 +127,7 @@ class RAGService:
 
     #     context = self._build_context(results)
     
-    def ask(self,
+    def ask_qwen(self,
         question: str,
         collection_name: str = "test_all_0.0.0.0",
         top_k: int = 5,
@@ -141,6 +135,60 @@ class RAGService:
         model_id: str | None = None,
     ) -> dict:
 
+        if self.query_router is not None:
+            route = self.query_router.classify(question)
+
+            if route.intent == QueryIntent.CONVERSATIONAL:
+                messages = [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a helpful AI assistant. "
+                                "Respond naturally and briefly to casual conversation. "
+                                "Do not invent or discuss document content unless the user asks about it."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": question,
+                        },
+                    ]
+                answer = self.llm_service.generate(messages=messages)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "model_id": model_id,
+                    "sources": [],
+                }
+
+            if route.intent == QueryIntent.UNKNOWN:
+                messages = [
+                        {
+                            "role": "system",
+                            "content": (
+                            "You are an AI knowledge assistant."
+                            "The user's request is ambiguous."
+
+                            "If they are asking about the uploaded documents, ask them to specify what they want to know."
+
+                            "If they are making casual conversation, respond naturally."
+
+                            "Do not invent information about the documents."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": question,
+                        },
+                    ]
+                answer = self.llm_service.generate(messages=messages)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "model_id": model_id,
+                    "sources": [],
+                }
+ 
         retrieval_top_k = max(top_k, 12)
         retrieved_chunks = self.retrieval_service.retrieve(
             query=question,
@@ -200,3 +248,125 @@ class RAGService:
             "model_id": model_id,
             "sources": sources,
         }
+    
+    def ask(self,
+        question: str,
+        collection_name: str = "test_all_0.0.0.0",
+        top_k: int = 5,
+        document_ids: list[UUID] | None = None,
+        model_id: str | None = None,
+    ) -> dict:
+
+        if self.query_router is not None:
+            route = self.query_router.classify(question)
+
+            if route.intent == QueryIntent.CONVERSATIONAL:
+                messages = [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a helpful AI assistant. "
+                                "Respond naturally and briefly to casual conversation. "
+                                "Do not invent or discuss document content unless the user asks about it."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": question,
+                        },
+                    ]
+                answer = self.llm_service.generate(messages=messages)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "model_id": model_id,
+                    "sources": [],
+                }
+
+            if route.intent == QueryIntent.UNKNOWN:
+                messages = [
+                        {
+                            "role": "system",
+                            "content": (
+                            "You are an AI knowledge assistant."
+                            "The user's request is ambiguous."
+
+                            "If they are asking about the uploaded documents, ask them to specify what they want to know."
+
+                            "If they are making casual conversation, respond naturally."
+
+                            "Do not invent information about the documents."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": question,
+                        },
+                    ]
+                answer = self.llm_service.generate(messages=messages)
+                return {
+                    "question": question,
+                    "answer": answer,
+                    "model_id": model_id,
+                    "sources": [],
+                }
+ 
+        retrieval_top_k = max(top_k, 12)
+        retrieved_chunks = self.retrieval_service.retrieve(
+            query=question,
+            collection_name=collection_name,
+            top_k=retrieval_top_k,
+            document_ids=document_ids,
+        )
+
+        if not retrieved_chunks:
+            return {
+                "question": question,
+                "answer": "No relevant document chunks were found in the selected collection.",
+                "model_id": model_id,
+                "sources": [],
+            }
+
+        context = self._build_context(retrieved_chunks)
+
+        prompt = self._build_prompt(question=question,context=context,)
+        answer = self.llm_service.generate(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ]
+        )
+
+        # Get document IDs from retrieved chunks to fetch original filenames
+        doc_ids_in_results = set()
+        for result in retrieved_chunks[:top_k]:
+            doc_id = result["metadata"].get("document_id")
+            if doc_id:  # Only collect non-None IDs
+                doc_ids_in_results.add(doc_id)
+        
+        # Batch query for filenames (single DB call, not N+1)
+        filename_map = self._get_document_filenames_map(list(doc_ids_in_results))
+
+        # Build sources list with original filenames
+        sources = []
+        for result in retrieved_chunks[:top_k]:
+            source_data = {
+                **result["metadata"],
+                "collection_name": collection_name,
+                "distance": result["distance"],
+            }
+            
+            # Replace "source" with original_filename if document_id is available
+            if "document_id" in result["metadata"] and result["metadata"]["document_id"] in filename_map:
+                source_data["source"] = filename_map[result["metadata"]["document_id"]]
+            
+            sources.append(source_data)
+
+        return {
+            "question": question,
+            "answer": answer,
+            "model_id": model_id,
+            "sources": sources,
+        }    

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
 
     # Embedding configuration
-    EMBEDDING_MODEL: str = "bge-small"
+    EMBEDDING_MODEL: str = "nomic-v1.5"
 
     # LLM configuration
     LLM_PROVIDER: str = "ollama"
@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     LLM_DEFAULT_MODEL_ID: str | None = None
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODELS: str = "qwen3:8b"
+    OLLAMA_MODELS: str = "qwen3:8b,deepseek-coder-v2:16b"
 
     GEMINI_API_KEY: str | None = None
     GEMINI_MODELS: str = ""

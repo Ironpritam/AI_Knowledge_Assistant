@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -26,23 +27,8 @@ class LLMModelRegistry:
     def _build_models(self) -> dict[str, RegisteredModel]:
         models: dict[str, RegisteredModel] = {}
 
-        # 1. Load from DB if session provided and records exist
-        if self.db is not None:
-            repo = LLMRepository(self.db)
-            db_models = repo.get_all()
-            if db_models:
-                for record in db_models:
-                    models[record.id] = RegisteredModel(
-                        id=record.id,
-                        label=record.label,
-                        provider=record.provider,
-                        model=record.model_name,
-                        enabled=record.is_enabled,
-                        is_default=record.is_default,
-                    )
-                return models
-
-        # 2. Fallback to settings / environment configuration
+        # 1. Load from settings / environment configuration first so configured
+        #    models are always visible even when DB has only a subset of rows.
         ollama_models = set(self._split_models(self.settings.OLLAMA_MODELS))
         if self.settings.LLM_PROVIDER == "ollama" and self.settings.LLM_MODEL:
             ollama_models.add(self.settings.LLM_MODEL.strip())
@@ -74,6 +60,21 @@ class LLMModelRegistry:
                 is_default=(reg_id == self._get_configured_default_id()),
             )
 
+        # 2. Merge DB records without discarding settings-based models.
+        if self.db is not None:
+            repo = LLMRepository(self.db)
+            db_models = repo.get_all()
+            for record in db_models:
+                reg_id = record.id
+                models[reg_id] = RegisteredModel(
+                    id=record.id,
+                    label=record.label,
+                    provider=record.provider,
+                    model=record.model_name,
+                    enabled=record.is_enabled,
+                    is_default=record.is_default,
+                )
+
         return models
 
     def _get_configured_default_id(self) -> str:
@@ -82,8 +83,27 @@ class LLMModelRegistry:
         return f"{self.settings.LLM_PROVIDER}:{self.settings.LLM_MODEL}"
 
     @staticmethod
-    def _split_models(configured_models: str) -> list[str]:
-        return [model.strip() for model in configured_models.split(",") if model.strip()]
+    def _split_models(configured_models: str | None) -> list[str]:
+        if not configured_models:
+            return []
+
+        cleaned_models: list[str] = []
+        for raw_model in str(configured_models).split(","):
+            model = raw_model.strip().strip('"').strip("'")
+            if not model:
+                continue
+
+            # Ignore Windows directories / path values like: P:\Installed_Softs\Ollama
+            if re.match(r"^[A-Za-z]:[\\/]", model):
+                continue
+
+            # Ignore common folder paths even if they are passed as a single string.
+            if any(sep in model for sep in ("\\", "/")) and not model.startswith("ollama://"):
+                continue
+
+            cleaned_models.append(model)
+
+        return cleaned_models
 
     @property
     def default_model_id(self) -> str:

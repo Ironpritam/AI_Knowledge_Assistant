@@ -25,10 +25,10 @@ def ask(
     model_registry: LLMModelRegistry = Depends(get_llm_model_registry),
     db: Session = Depends(get_db),
 ):
+    documents: list = []
     if request.document_ids:
-        documents = DocumentRepository.get_all(
-            request.document_ids
-        )
+        repository = DocumentRepository(db)
+        documents = repository.get_all(request.document_ids)
 
         if len(documents) != len(set(request.document_ids)):
             raise HTTPException(
@@ -60,6 +60,7 @@ def ask(
             model=selected_model.model,
         ),
         db=db,
+        query_router=rag_service.query_router,
     )
 
     return rag_service.ask(

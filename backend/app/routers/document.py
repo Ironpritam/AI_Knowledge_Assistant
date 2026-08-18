@@ -26,7 +26,49 @@ router = APIRouter(
 UPLOAD_DIR = Path("storage/documents/uploaded")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_EXTENSIONS = {".pdf"}
+ALLOWED_EXTENSIONS = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".ppt",
+    ".pptx",
+    ".xls",
+    ".xlsx",
+    ".txt",
+    ".md",
+    ".csv",
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".java",
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cxx",
+    ".h",
+    ".hpp",
+    ".rs",
+    ".go",
+    ".kt",
+    ".swift",
+    ".php",
+    ".rb",
+    ".cs",
+    ".scala",
+    ".sh",
+    ".bash",
+    ".json",
+    ".html",
+    ".htm",
+    ".css",
+    ".sql",
+    ".xml",
+    ".yaml",
+    ".yml",
+    ".log",
+}
 
 
 @router.post("/upload", response_model=DocumentUploadResponse)
@@ -39,9 +81,10 @@ async def upload_document(
     extension = Path(file.filename).suffix.lower()
 
     if extension not in ALLOWED_EXTENSIONS:
+        supported = ", ".join(sorted(ALLOWED_EXTENSIONS))
         raise HTTPException(
             status_code=400,
-            detail="Only PDF files are supported."
+            detail=f"Unsupported file type '{extension}'. Supported formats: {supported}",
         )
 
     stored_filename = f"{uuid4()}{extension}"

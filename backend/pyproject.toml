@@ -9,28 +9,29 @@ dependencies = [
     # Backend
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.35.0",
-
     # Database
     "sqlalchemy>=2.0.51",
     "alembic>=1.19.0",
     "psycopg2-binary>=2.9.12",
-
     # Configuration
     "pydantic-settings>=2.14.2",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",
-
     # AI
     "google-genai>=1.0.0",
     "sentence-transformers>=2.2.2",
     "chromadb>=1.5.9",
     "torch==2.13.0",
-
     # Document Processing
     "pymupdf>=1.28.0",
     "unstructured>=0.25.2",
     "tiktoken>=0.13.0",
     "langchain-text-splitters>=1.1.2",
+    "gguf>=0.19.0",
+    "python-docx>=1.2.0",
+    "python-pptx>=1.0.2",
+    "openpyxl>=3.1.5",
+    "compressed-tensors>=0.18.0",
 ]
 
 [dependency-groups]
