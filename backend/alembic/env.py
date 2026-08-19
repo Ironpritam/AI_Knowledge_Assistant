@@ -7,6 +7,10 @@ from alembic import context
 
 from app.database.base import Base
 from app.core.settings import settings
+from app.models.chat_message import ChatMessage
+from app.models.chat_session import ChatSession
+from app.models.chat_run import ChatRun
+from app.models.chat_audit_event import ChatAuditEvent
 from app.models.document import Document
 from app.models.llm_model import LLMModel
 

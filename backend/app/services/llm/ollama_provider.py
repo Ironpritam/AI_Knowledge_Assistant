@@ -1,6 +1,7 @@
 import requests
 from fastapi import HTTPException
 
+from app.core.settings import settings
 from app.services.llm.base import LLMProvider
 
 
@@ -9,7 +10,11 @@ class OllamaProvider(LLMProvider):
         self.model = model
         self.base_url = base_url.rstrip("/")
 
-    def generate(self,messages: list[dict],) -> str:
+    def generate(
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+    ) -> str:
         try:
             response = requests.post(
                 f"{self.base_url}/api/chat",
@@ -18,7 +23,7 @@ class OllamaProvider(LLMProvider):
                     "messages": messages,
                     "stream": False,
                     "options": {
-                        "num_predict": 512,
+                        "num_predict": max_tokens or settings.LLM_MAX_OUTPUT_TOKENS,
                         "temperature": 0.2,
                         "top_p": 0.9,
                     },
@@ -30,7 +35,11 @@ class OllamaProvider(LLMProvider):
         except requests.exceptions.RequestException as exc:
             raise HTTPException(
                 status_code=503,
-                detail=f"Ollama LLM service is unavailable at {self.base_url}. Please ensure Ollama is running and the model '{self.model}' is available.",
+                detail=(
+                    f"Ollama LLM service is unavailable at {self.base_url}. "
+                    f"Please ensure Ollama is running and the model '{self.model}' "
+                    "is available."
+                ),
             ) from exc
 
         if "message" not in data or "content" not in data["message"]:

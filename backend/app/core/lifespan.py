@@ -1,14 +1,35 @@
-from contextlib import asynccontextmanager
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
+
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.settings import settings
-from app.services.vector.embedding_service import EmbeddingService
-from app.services.vector.chroma_service import ChromaService
+from app.database.session import SessionLocal
+from app.repositories.chat_repository import ChatSessionRepository
+from app.services.document.ingestion_service import DocumentIngestionService
 from app.services.llm.llm_service import LLMService
 from app.services.llm.model_registry import LLMModelRegistry
-from app.services.document.ingestion_service import DocumentIngestionService
 from app.services.rag.query_router import QueryIntentRouter
+from app.services.vector.chroma_service import ChromaService
+from app.services.vector.embedding_service import EmbeddingService
 
 print(f"Using embedding model: {settings.EMBEDDING_MODEL}")
+logger = logging.getLogger(__name__)
+
+
+async def prune_expired_chat_sessions() -> None:
+    """Keep expiration cleanup off the request path during normal operation."""
+    interval_seconds = max(settings.CHAT_PRUNE_INTERVAL_MINUTES, 1) * 60
+    while True:
+        db = SessionLocal()
+        try:
+            ChatSessionRepository(db).prune_expired()
+        except SQLAlchemyError:
+            logger.exception("Unable to prune expired chat sessions")
+        finally:
+            db.close()
+        await asyncio.sleep(interval_seconds)
 
 @asynccontextmanager
 async def lifespan(app):
@@ -63,6 +84,12 @@ async def lifespan(app):
     app.state.document_ingestion_service = document_ingestion_service
     app.state.query_router = query_router
 
+    cleanup_task = asyncio.create_task(prune_expired_chat_sessions())
     print("✅ AI Knowledge Assistant ready")
-    yield
-    print("🛑 Shutting down AI Knowledge Assistant")
+    try:
+        yield
+    finally:
+        cleanup_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup_task
+        print("🛑 Shutting down AI Knowledge Assistant")

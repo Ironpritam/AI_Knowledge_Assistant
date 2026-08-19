@@ -322,7 +322,7 @@ def test_failed_upload_keeps_a_failed_record_and_cleans_the_file(
     assert failed_document.status == "failed"
     assert not Path(failed_document.file_path).exists()
     assert list(upload_directory.iterdir()) == []
-    collection = chroma_service.client.get_collection("test_ingestion_bge")
+    collection = chroma_service.client.get_collection("test_all_0.0.0.0")
     assert collection.get(where={"document_id": str(failed_document.id)})["ids"] == []
 
 

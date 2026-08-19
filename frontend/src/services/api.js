@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1",
+    baseURL: import.meta.env.VITE_API_BASE_URL || "/api/v1",
     timeout: 120000,
 });
 
@@ -24,6 +24,22 @@ export const documentApi = {
 
 export const ragApi = {
     ask: (payload) => api.post("/rag/ask", payload),
+};
+
+export const chatApi = {
+    listSessions: () => api.get("/chat/sessions"),
+
+    createSession: (title) =>
+        api.post("/chat/sessions", title ? { title } : {}),
+
+    getSession: (sessionId) =>
+        api.get(`/chat/sessions/${sessionId}`),
+
+    deleteSession: (sessionId) =>
+        api.delete(`/chat/sessions/${sessionId}`),
+
+    addMessage: (sessionId, payload) =>
+        api.post(`/chat/sessions/${sessionId}/messages`, payload),
 };
 
 export const modelApi = {

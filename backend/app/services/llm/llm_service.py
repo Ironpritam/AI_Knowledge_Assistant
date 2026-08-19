@@ -1,14 +1,20 @@
 from app.services.llm.base import LLMProvider
-from app.core.settings import settings
-from app.services.llm.gemini_provider import GeminiProvider
-from app.services.llm.ollama_provider import OllamaProvider
-from app.services.llm.base import LLMProvider
 from app.services.llm.factory import ProviderFactory
 
+
 class LLMService:
-    def __init__(self, provider: str = "ollama", model: str = "qwen3:8b", **kwargs):
+    def __init__(
+        self,
+        provider: str = "ollama",
+        model: str = "qwen3:8b",
+        **kwargs,
+    ):
         self.provider_name = provider
-        self.provider: LLMProvider = ProviderFactory.get_or_create(provider=provider, model=model, **kwargs)
+        self.provider: LLMProvider = ProviderFactory.get_or_create(
+            provider=provider,
+            model=model,
+            **kwargs,
+        )
 
     # def _create_provider(self,provider: str,model: str,) -> LLMProvider:
     #     if provider == "ollama":
@@ -20,5 +26,9 @@ class LLMService:
     #         return GeminiProvider(model=model, api_key=api_key)
     #     raise ValueError(f"Unsupported LLM provider: {provider}")
 
-    def generate(self,messages: list[dict],) -> str:
-        return self.provider.generate(messages)
+    def generate(
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+    ) -> str:
+        return self.provider.generate(messages, max_tokens=max_tokens)

@@ -18,9 +18,20 @@ class OpenAICompatibleProvider(LLMProvider):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def generate(self, messages: list[dict]) -> str:
-        if not self.api_key and "localhost" not in self.base_url and "127.0.0.1" not in self.base_url:
-            raise HTTPException(status_code=503, detail=f"API key missing for provider at {self.base_url}.")
+    def generate(
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+    ) -> str:
+        if (
+            not self.api_key
+            and "localhost" not in self.base_url
+            and "127.0.0.1" not in self.base_url
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail=f"API key missing for provider at {self.base_url}.",
+            )
 
         headers = {
             "Content-Type": "application/json",
@@ -32,6 +43,8 @@ class OpenAICompatibleProvider(LLMProvider):
             "messages": messages,
             "temperature": 0.2,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
 
         try:
             response = requests.post(
@@ -50,7 +63,11 @@ class OpenAICompatibleProvider(LLMProvider):
             raise HTTPException(status_code=503, detail=detail) from exc
 
     def is_available(self) -> bool:
-        if not self.api_key and "localhost" not in self.base_url and "127.0.0.1" not in self.base_url:
+        if (
+            not self.api_key
+            and "localhost" not in self.base_url
+            and "127.0.0.1" not in self.base_url
+        ):
             return False
 
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}

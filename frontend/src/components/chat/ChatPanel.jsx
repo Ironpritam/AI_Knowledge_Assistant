@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { ragApi } from "../../services/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { chatApi,ragApi } from "../../services/api";
 
 import MessageList from "./MessageList";
 import ChatInput from "./ChatInput";
 
 import "./ChatPanel.css";
+
+const getErrorMessage = (err, fallback) =>
+  err.response?.data?.error?.message ||
+  err.response?.data?.detail ||
+  fallback;
 
 function ChatPanel({
   selectedDocuments,
@@ -15,10 +20,91 @@ function ChatPanel({
   collectionName,
 }) {
   const [messages, setMessages] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const chatContentRef = useRef(null);
+  const initializedRef = useRef(false);
+
+  const refreshSessions = useCallback(async () => {
+    const response = await chatApi.listSessions();
+    setSessions(response.data.items);
+    return response.data.items;
+  }, []);
+
+  const activateSession = useCallback(async (nextSessionId) => {
+    const response = await chatApi.getSession(nextSessionId);
+    const session = response.data;
+
+    setSessionId(session.id);
+    setMessages(session.messages || []);
+    localStorage.setItem("activeChatSessionId", session.id);
+  }, []);
+
+  const createAndActivateSession = useCallback(async () => {
+    const response = await chatApi.createSession();
+    const session = response.data;
+
+    setSessionId(session.id);
+    setMessages([]);
+    localStorage.setItem("activeChatSessionId", session.id);
+    await refreshSessions();
+    return session;
+  }, [refreshSessions]);
+
+  useEffect(() => {
+    if (initializedRef.current) {
+      return;
+    }
+    initializedRef.current = true;
+
+    const initializeSession = async () => {
+      try {
+        setError("");
+        await refreshSessions();
+
+        const storedSessionId = localStorage.getItem(
+          "activeChatSessionId"
+        );
+
+        if (storedSessionId) {
+          try {
+            const response =
+              await chatApi.getSession(storedSessionId);
+
+            const session = response.data;
+
+            setSessionId(session.id);
+            setMessages(session.messages || []);
+
+            return;
+          } catch (err) {
+            console.warn(
+              "Stored chat session could not be restored. Creating a new session.",
+              err
+            );
+
+            localStorage.removeItem("activeChatSessionId");
+          }
+        }
+
+        await createAndActivateSession();
+      } catch (err) {
+        console.error(
+          "Failed to initialize chat session:",
+          err
+        );
+
+        setError(
+          getErrorMessage(err, "Unable to initialize chat session.")
+        );
+      }
+    };
+
+    initializeSession();
+  }, [createAndActivateSession, refreshSessions]);
 
   useEffect(() => {
     const container = chatContentRef.current;
@@ -33,17 +119,14 @@ function ChatPanel({
     });
   }, [messages, loading]);
 
-  // Conversation is intentionally local-state only for V1.
-  // Reset when document scope changes.
-  useEffect(() => {
-    setMessages([]);
-    setError("");
-  }, [
-    selectedDocuments.map((document) => document.id).join(","),
-  ]);
 
   const handleSend = async (question) => {
     if (!question || loading) {
+      return;
+    }
+
+    if (!sessionId) {
+      setError("Chat session is still initializing. Please try again.");
       return;
     }
 
@@ -75,9 +158,11 @@ function ChatPanel({
             ? selectedDocuments.map(
                 (document) => document.id
               )
-            : null,
+          : [],
         model_id: selectedModel,
         top_k: 5,
+        session_id: sessionId,
+        client_request_id: crypto.randomUUID(),
       });
 
       const data = response.data;
@@ -95,23 +180,74 @@ function ChatPanel({
         ...current,
         assistantMessage,
       ]);
+      await refreshSessions();
     } catch (err) {
       setError(
-        err.response?.data?.detail ||
+        getErrorMessage(
+          err,
           "Unable to generate an answer. Please check document selection or health of the application."
+        )
       );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleClearChat = () => {
-    if (loading || messages.length === 0) {
+  const handleClearChat = async () => {
+    if (loading) {
       return;
     }
 
-    setMessages([]);
-    setError("");
+    try {
+      setError("");
+
+      await createAndActivateSession();
+    } catch (err) {
+      console.error(
+        "Failed to create new chat session:",
+        err
+      );
+
+      setError(
+        getErrorMessage(err, "Unable to start a new chat.")
+      );
+    }
+  };
+
+  const handleSessionChange = async (event) => {
+    const nextSessionId = event.target.value;
+    if (!nextSessionId || nextSessionId === sessionId || loading) {
+      return;
+    }
+
+    try {
+      setError("");
+      await activateSession(nextSessionId);
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to open this chat."));
+      await refreshSessions();
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionId || loading) {
+      return;
+    }
+
+    try {
+      setError("");
+      await chatApi.deleteSession(sessionId);
+      const remainingSessions = await refreshSessions();
+      const nextSession = remainingSessions[0];
+
+      if (nextSession) {
+        await activateSession(nextSession.id);
+      } else {
+        await createAndActivateSession();
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, "Unable to delete this chat."));
+    }
   };
 
   const inputPlaceholder =
@@ -144,16 +280,39 @@ function ChatPanel({
         </div>
 
         <div className="chat-header-actions">
-          {messages.length > 0 && (
-            <button
-              type="button"
-              className="clear-chat-button"
-              onClick={handleClearChat}
-              disabled={loading}
+          <label className="session-picker">
+            <span className="sr-only">Select chat</span>
+            <select
+              value={sessionId || ""}
+              onChange={handleSessionChange}
+              disabled={!sessions.length || loading}
+              aria-label="Select chat"
             >
-              New chat
-            </button>
-          )}
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.title || "New chat"}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            className="clear-chat-button"
+            onClick={handleClearChat}
+            disabled={loading}
+          >
+            New chat
+          </button>
+
+          <button
+            type="button"
+            className="delete-chat-button"
+            onClick={handleDeleteSession}
+            disabled={!sessionId || loading}
+          >
+            Delete
+          </button>
 
           <select
             value={selectedModel}

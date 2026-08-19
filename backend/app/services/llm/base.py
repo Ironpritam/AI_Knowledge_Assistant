@@ -4,7 +4,11 @@ from abc import ABC, abstractmethod
 class LLMProvider(ABC):
 
     @abstractmethod
-    def generate(self,messages: list[dict],) -> str:
+    def generate(
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+    ) -> str:
         pass
 
     @abstractmethod

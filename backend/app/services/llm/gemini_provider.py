@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from google import genai
+from google.genai import types
 
 from app.services.llm.base import LLMProvider
 
@@ -10,16 +11,26 @@ class GeminiProvider(LLMProvider):
         self.api_key = api_key
         self.client = genai.Client(api_key=api_key)
 
-    def generate(self, messages: list[dict]) -> str:
+    def generate(
+        self,
+        messages: list[dict],
+        max_tokens: int | None = None,
+    ) -> str:
         prompt = "\n\n".join(
             f"{message['role'].upper()}: {message['content']}"
             for message in messages
         )
 
         try:
+            generation_config = (
+                types.GenerateContentConfig(max_output_tokens=max_tokens)
+                if max_tokens is not None
+                else None
+            )
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=prompt,
+                config=generation_config,
             )
         except Exception as exc:
             raise HTTPException(

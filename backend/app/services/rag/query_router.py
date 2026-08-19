@@ -1,15 +1,20 @@
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 import numpy as np
 
 
-class QueryIntent(str, Enum):
+class QueryIntent(StrEnum):
     CONVERSATIONAL = "conversational"
     DOCUMENT = "document"
     HYBRID = "hybrid"
     UNKNOWN = "unknown"
+
+
+class DocumentRetrievalStrategy(StrEnum):
+    RELEVANCE = "relevance"
+    COVERAGE = "coverage"
 
 
 @dataclass
@@ -127,6 +132,32 @@ class QueryIntentRouter:
 
         return False
 
+    @staticmethod
+    def document_retrieval_strategy(
+        query: str,
+        selected_document_count: int,
+    ) -> DocumentRetrievalStrategy:
+        """Choose whether selection is a search scope or a coverage requirement."""
+        if selected_document_count < 2:
+            return DocumentRetrievalStrategy.RELEVANCE
+
+        normalized_query = re.sub(r"[^a-z0-9\s']+", " ", query.lower())
+        asks_for_overview = any(
+            term in normalized_query
+            for term in ("summarize", "summarise", "summary", "overview", "compare")
+        )
+        refers_to_multiple_documents = bool(
+            re.search(
+                r"\b(all|each|every|both|selected|documents|docs|files|pdfs|reports|papers)\b",
+                normalized_query,
+            )
+        )
+
+        if asks_for_overview and refers_to_multiple_documents:
+            return DocumentRetrievalStrategy.COVERAGE
+
+        return DocumentRetrievalStrategy.RELEVANCE
+
     def classify(self, query: str) -> QueryRoute:
         query = query.strip()
         if not query:
@@ -229,7 +260,10 @@ class QueryIntentRouter:
                 scores=scores,
             )
 
-        if conversation_score >= self.conversation_threshold and conversation_score > document_score + 0.08:
+        if (
+            conversation_score >= self.conversation_threshold
+            and conversation_score > document_score + 0.08
+        ):
             return QueryRoute(
                 intent=QueryIntent.CONVERSATIONAL,
                 confidence=conversation_score,
